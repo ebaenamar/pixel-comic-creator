@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import ComicGenerator from '@/components/ComicGenerator';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import ComicGenerator from '../components/ComicGenerator';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
 export default function Home() {
   const [story, setStory] = useState('');
