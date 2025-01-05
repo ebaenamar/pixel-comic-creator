@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
 import OpenAI from 'openai';
 
+export const runtime = 'edge'; // Use Edge Runtime
+
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
@@ -44,21 +46,37 @@ async function generateImagePrompt(story: string): Promise<string> {
   return `A pixel art scene in David Lynch's style: ${content}`;
 }
 
-async function waitForReplicateOutput(prediction: any): Promise<string> {
+async function generateImage(prompt: string): Promise<string> {
+  const prediction = await replicate.predictions.create({
+    version: "ad2ed84b27e27ce1e4a613c9b9c3b9c562bd8ca4b0271a35352ca158be1708b5",
+    input: {
+      prompt: prompt,
+      replicate_weights: "https://replicate.delivery/xezq/dDnQllIyR9pKBJo8MEHj5I76d6MA0eCDQrgoqcyiGHe9fTEoA/trained_model.tar"
+    }
+  });
+
+  // Get the prediction URL for checking status
+  const predictionUrl = prediction.urls?.get;
+  if (!predictionUrl) {
+    throw new Error('Failed to get prediction URL');
+  }
+
+  // Poll for the result
   let attempts = 0;
-  const maxAttempts = 30;
+  const maxAttempts = 60; // 60 seconds timeout
   
   while (attempts < maxAttempts) {
-    if (prediction.status === 'succeeded') {
-      return prediction.output[0] || '';
+    const response = await fetch(predictionUrl);
+    const result = await response.json();
+
+    if (result.status === 'succeeded') {
+      return result.output[0] || '';
     }
-    if (prediction.status === 'failed') {
+    if (result.status === 'failed') {
       throw new Error('Image generation failed');
     }
     
     await new Promise(resolve => setTimeout(resolve, 1000));
-    const response = await fetch(prediction.urls.get);
-    prediction = await response.json();
     attempts++;
   }
   
@@ -71,18 +89,9 @@ export async function POST(req: Request) {
     
     // Generate the image description with GPT-4
     const imagePrompt = await generateImagePrompt(prompt);
-    console.log('Generated prompt:', imagePrompt); // For debugging
     
     // Generate the image with Replicate
-    const prediction = await replicate.predictions.create({
-      version: "ad2ed84b27e27ce1e4a613c9b9c3b9c562bd8ca4b0271a35352ca158be1708b5",
-      input: {
-        prompt: imagePrompt,
-        replicate_weights: "https://replicate.delivery/xezq/dDnQllIyR9pKBJo8MEHj5I76d6MA0eCDQrgoqcyiGHe9fTEoA/trained_model.tar"
-      }
-    });
-
-    const imageUrl = await waitForReplicateOutput(prediction);
+    const imageUrl = await generateImage(imagePrompt);
     
     return NextResponse.json({ 
       url: imageUrl,
