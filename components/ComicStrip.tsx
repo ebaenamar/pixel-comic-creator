@@ -1,3 +1,7 @@
+'use client';
+
+import { motion } from 'framer-motion';
+
 interface Panel {
   url: string;
   description: string;
@@ -9,25 +13,35 @@ interface ComicStripProps {
 
 export default function ComicStrip({ panels }: ComicStripProps) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {panels.map((panel, index) => (
-          <div 
+          <motion.div
             key={index}
-            className="relative bg-gray-800 rounded-lg overflow-hidden shadow-lg"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.2 }}
+            className="glass-panel overflow-hidden group"
           >
-            <img
-              src={panel.url}
-              alt={panel.description}
-              className="w-full h-auto object-cover"
-              loading="lazy"
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-2">
-              <p className="text-xs text-gray-200">
-                {panel.description}
-              </p>
+            <div className="relative aspect-square">
+              <img
+                src={panel.url}
+                alt={panel.description}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: index * 0.2 + 0.3 }}
+                className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent"
+              >
+                <p className="text-sm text-gray-200">
+                  {panel.description}
+                </p>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>

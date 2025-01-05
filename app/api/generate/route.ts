@@ -1,42 +1,70 @@
 import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
+import OpenAI from 'openai';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+interface StoryPanel {
+  title: string;
+  description: string;
+  mood: string;
+  visualElements: string[];
+}
 
 interface PanelPrompt {
   description: string;
   prompt: string;
 }
 
-async function generateStoryboard(story: string): Promise<PanelPrompt[]> {
-  // This would be replaced with actual ChatGPT API call
-  const basePrompt = "A surreal and dreamlike scene in David Lynch's style. ";
-  const panels: PanelPrompt[] = [
-    {
-      description: "Opening Scene - Setting the Mood",
-      prompt: `${basePrompt} ${story} The scene is dimly lit with flickering neon lights casting unnatural shadows. The atmosphere is eerie and dreamlike, with a muted color palette of deep reds, blues, and shadowy blacks.`
-    },
-    {
-      description: "Rising Tension - The Surreal Turn",
-      prompt: `${basePrompt} The scene becomes more distorted and unsettling. Strange symbols emerge from the shadows, while characters move with an otherworldly quality.`
-    },
-    {
-      description: "Climactic Moment - Reality Fractures",
-      prompt: `${basePrompt} Multiple layers of existence overlap. The lighting becomes intense, creating stark contrasts. The scene pulses with electric energy.`
-    },
-    {
-      description: "Resolution - The Dream Lingers",
-      prompt: `${basePrompt} The scene resolves into a haunting image. Previous elements reappear transformed. The lighting creates a hypnotic quality.`
-    }
-  ];
-  return panels;
+async function generateStoryboardWithGPT(story: string): Promise<StoryPanel[]> {
+  const prompt = `Create a 4-panel storyboard for a surreal, Lynch-inspired comic based on this story: "${story}"
+  
+  Format each panel as JSON with:
+  - title: A short title for the panel
+  - description: A vivid description of what happens in this panel
+  - mood: The emotional atmosphere and lighting
+  - visualElements: Key visual elements to include (3-4 items)
+
+  Make it mysterious and engaging, with a clear narrative arc across the 4 panels.
+  Focus on creating surreal, dreamlike imagery that would work well in pixel art style.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      {
+        role: "system",
+        content: "You are a comic book artist specializing in surreal, David Lynch-inspired storytelling. You excel at breaking down stories into vivid visual sequences."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.7,
+  });
+
+  const response = JSON.parse(completion.choices[0].message.content);
+  return response.panels;
+}
+
+function createImagePrompt(panel: StoryPanel): string {
+  const visualElements = panel.visualElements.join(", ");
+  return `A surreal and dreamlike pixel art scene in David Lynch's style. ${panel.description}
+         The mood is ${panel.mood}. Key elements: ${visualElements}.
+         The scene should be highly detailed pixel art with a resolution that captures intricate details.
+         Use a color palette inspired by Lynch's films with deep reds, blues, and shadowy blacks.`.replace(/\s+/g, ' ').trim();
 }
 
 async function waitForReplicateOutput(prediction: any): Promise<string> {
   let attempts = 0;
-  const maxAttempts = 30; // 30 seconds timeout
+  const maxAttempts = 30;
   
   while (attempts < maxAttempts) {
     if (prediction.status === 'succeeded') {
@@ -58,13 +86,17 @@ async function waitForReplicateOutput(prediction: any): Promise<string> {
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
-    const storyboard = await generateStoryboard(prompt);
     
-    const imagePromises = storyboard.map(async (panel) => {
+    // First, generate the storyboard with GPT-4
+    const storyPanels = await generateStoryboardWithGPT(prompt);
+    
+    // Then, create image prompts and generate images
+    const imagePromises = storyPanels.map(async (panel) => {
+      const imagePrompt = createImagePrompt(panel);
       const prediction = await replicate.predictions.create({
         version: "ad2ed84b27e27ce1e4a613c9b9c3b9c562bd8ca4b0271a35352ca158be1708b5",
         input: {
-          prompt: panel.prompt,
+          prompt: imagePrompt,
           replicate_weights: "https://replicate.delivery/xezq/dDnQllIyR9pKBJo8MEHj5I76d6MA0eCDQrgoqcyiGHe9fTEoA/trained_model.tar"
         }
       });
@@ -72,20 +104,17 @@ export async function POST(req: Request) {
       const imageUrl = await waitForReplicateOutput(prediction);
       return {
         url: imageUrl,
-        description: panel.description
+        description: `${panel.title}: ${panel.description}`
       };
     });
 
     const panels = await Promise.all(imagePromises);
     
-    return NextResponse.json({ 
-      panels,
-      storyboard: storyboard.map(panel => panel.description)
-    });
+    return NextResponse.json({ panels });
   } catch (error) {
-    console.error('Error generating images:', error);
+    console.error('Error generating comic:', error);
     return NextResponse.json(
-      { error: 'Failed to generate images' },
+      { error: 'Failed to generate comic' },
       { status: 500 }
     );
   }
