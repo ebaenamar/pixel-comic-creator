@@ -48,12 +48,12 @@ export async function POST(req: Request) {
     const storyboard = createLynchianStoryboard(prompt);
     
     const imagePromises = storyboard.map(async (panel) => {
-      const output = await replicate.predictions.create(
-        version="sundai-club/lynch", // Your model details
-        input={
+      const output = await replicate.predictions.create({
+        version: "sundai-club/lynch",
+        input: {
           prompt: panel.prompt,
         }
-      );
+      });
       return output;
     });
 
