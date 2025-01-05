@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
 import OpenAI from 'openai';
 
-export const maxDuration = 300; // Increase to 5 minutes
+export const maxDuration = 300; // 5 minutes
 export const dynamic = 'force-dynamic';
 export const runtime = 'edge';
 
@@ -55,6 +55,7 @@ async function generateImagePrompt(story: string): Promise<string> {
 
 async function generateImage(prompt: string): Promise<string> {
   try {
+    // Create the prediction
     const prediction = await replicate.predictions.create({
       version: "ad2ed84b27e27ce1e4a613c9b9c3b9c562bd8ca4b0271a35352ca158be1708b5",
       input: {
@@ -68,7 +69,13 @@ async function generateImage(prompt: string): Promise<string> {
       }
     });
 
-    // Get the prediction URL for checking status
+    // Extract the stream URL directly from the prediction response
+    const streamUrl = prediction.urls?.stream;
+    if (streamUrl) {
+      return streamUrl;
+    }
+
+    // If no stream URL, fall back to polling for the output
     const predictionUrl = prediction.urls?.get;
     if (!predictionUrl) {
       throw new Error('Failed to get prediction URL');
