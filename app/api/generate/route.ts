@@ -50,7 +50,16 @@ async function generateStoryboardWithGPT(story: string): Promise<StoryPanel[]> {
     temperature: 0.7,
   });
 
-  const response = JSON.parse(completion.choices[0].message.content);
+  const content = completion.choices[0].message.content;
+  if (!content) {
+    throw new Error('Failed to generate storyboard');
+  }
+
+  const response = JSON.parse(content);
+  if (!response.panels || !Array.isArray(response.panels)) {
+    throw new Error('Invalid storyboard format');
+  }
+
   return response.panels;
 }
 
