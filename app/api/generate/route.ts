@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import Replicate from 'replicate';
 import OpenAI from 'openai';
 
-export const runtime = 'edge'; // Use Edge Runtime
+export const maxDuration = 60; // This function can run for a maximum of 60 seconds
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
