@@ -3,19 +3,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { SparklesIcon } from '@heroicons/react/24/solid';
-import ComicStrip from './ComicStrip';
 
-interface Panel {
+interface GeneratedImage {
   url: string;
-  description: string;
+  prompt: string;
 }
 
 export default function ComicGenerator({ story, setStory }: { story: string; setStory: (story: string) => void }) {
   const [isLoading, setIsLoading] = useState(false);
-  const [panels, setPanels] = useState<Panel[]>([]);
+  const [image, setImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState('');
 
-  const generateComic = async () => {
+  const generateImage = async () => {
     setIsLoading(true);
     setError('');
     try {
@@ -25,12 +24,12 @@ export default function ComicGenerator({ story, setStory }: { story: string; set
         body: JSON.stringify({ prompt: story }),
       });
 
-      if (!response.ok) throw new Error('Failed to generate comic');
+      if (!response.ok) throw new Error('Failed to generate image');
       
       const data = await response.json();
-      setPanels(data.panels);
+      setImage(data);
     } catch (err) {
-      setError('Failed to generate comic. Please try again.');
+      setError('Failed to generate image. Please try again.');
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -43,7 +42,7 @@ export default function ComicGenerator({ story, setStory }: { story: string; set
         <textarea
           value={story}
           onChange={(e) => setStory(e.target.value)}
-          placeholder="Describe your story... (e.g., 'In a neon-lit cyberpunk city, a mysterious figure discovers an ancient pixel artifact...')"
+          placeholder="Describe your scene... (e.g., 'In a neon-lit diner, a mysterious figure sips coffee while whispering secrets to their reflection...')"
           className="input-field min-h-[120px] resize-none"
           maxLength={500}
         />
@@ -55,19 +54,19 @@ export default function ComicGenerator({ story, setStory }: { story: string; set
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        onClick={generateComic}
+        onClick={generateImage}
         disabled={isLoading || story.length < 10}
         className="btn-primary w-full flex items-center justify-center gap-2"
       >
         {isLoading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>Generating Comic...</span>
+            <span>Generating Image...</span>
           </>
         ) : (
           <>
             <SparklesIcon className="w-5 h-5" />
-            <span>Transform into Comic</span>
+            <span>Generate Pixel Art</span>
           </>
         )}
       </motion.button>
@@ -86,13 +85,25 @@ export default function ComicGenerator({ story, setStory }: { story: string; set
       </AnimatePresence>
 
       <AnimatePresence>
-        {panels.length > 0 && (
+        {image && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
+            className="glass-panel overflow-hidden"
           >
-            <ComicStrip panels={panels} />
+            <div className="relative">
+              <img
+                src={image.url}
+                alt="Generated pixel art"
+                className="w-full h-auto object-cover rounded-t-lg"
+                loading="lazy"
+              />
+              <div className="p-4 bg-black/50 text-sm text-gray-200">
+                <p className="font-medium mb-2">Generated Scene:</p>
+                <p>{image.prompt}</p>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
