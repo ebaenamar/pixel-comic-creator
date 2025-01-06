@@ -1,112 +1,103 @@
-'use client';
-
-import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { SparklesIcon } from '@heroicons/react/24/solid';
+import { motion } from 'framer-motion';
 
-interface GeneratedImage {
+interface Scene {
+  title: string;
+  description: string;
   url: string;
-  prompt: string;
 }
 
-export default function ComicGenerator({ story, setStory }: { story: string; setStory: (story: string) => void }) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [image, setImage] = useState<GeneratedImage | null>(null);
-  const [error, setError] = useState('');
+export default function ComicGenerator() {
+  const [prompt, setPrompt] = useState('');
+  const [scenes, setScenes] = useState<Scene[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const generateImage = async () => {
-    setIsLoading(true);
-    setError('');
+  const generateComic = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    setScenes([]);
+
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: story }),
+        body: JSON.stringify({ prompt })
       });
 
-      if (!response.ok) throw new Error('Failed to generate image');
-      
+      if (!response.ok) {
+        throw new Error('Failed to generate comic');
+      }
+
       const data = await response.json();
-      setImage(data);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setScenes(data.scenes);
     } catch (err) {
-      setError('Failed to generate image. Please try again.');
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="relative">
+    <div className="w-full max-w-4xl mx-auto p-4 space-y-8">
+      <form onSubmit={generateComic} className="space-y-4">
         <textarea
-          value={story}
-          onChange={(e) => setStory(e.target.value)}
-          placeholder="Describe your scene... (e.g., 'In a neon-lit diner, a mysterious figure sips coffee while whispering secrets to their reflection...')"
-          className="input-field min-h-[120px] resize-none"
-          maxLength={500}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Describe your story..."
+          className="input-field h-32"
+          required
+          minLength={10}
         />
-        <div className="absolute bottom-3 right-3 text-sm text-gray-400">
-          {story.length}/500
+        <button
+          type="submit"
+          disabled={loading || prompt.length < 10}
+          className="btn-primary w-full"
+        >
+          {loading ? 'Generating Comic...' : 'Generate Comic'}
+        </button>
+      </form>
+
+      {error && (
+        <div className="glass-panel p-4 text-red-400">
+          {error}
         </div>
-      </div>
+      )}
 
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={generateImage}
-        disabled={isLoading || story.length < 10}
-        className="btn-primary w-full flex items-center justify-center gap-2"
-      >
-        {isLoading ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>Generating Image...</span>
-          </>
-        ) : (
-          <>
-            <SparklesIcon className="w-5 h-5" />
-            <span>Generate Pixel Art</span>
-          </>
-        )}
-      </motion.button>
-
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-center"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {image && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="glass-panel overflow-hidden"
-          >
-            <div className="relative">
-              <img
-                src={image.url}
-                alt="Generated pixel art"
-                className="w-full h-auto object-cover rounded-t-lg"
-                loading="lazy"
-              />
-              <div className="p-4 bg-black/50 text-sm text-gray-200">
-                <p className="font-medium mb-2">Generated Scene:</p>
-                <p>{image.prompt}</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {scenes.length > 0 && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {scenes.map((scene, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.2 }}
+                className="glass-panel p-4 space-y-4"
+              >
+                <h3 className="text-xl font-semibold text-white">
+                  {scene.title}
+                </h3>
+                <p className="text-sm text-gray-300">
+                  {scene.description}
+                </p>
+                <div className="relative aspect-square">
+                  <img
+                    src={scene.url}
+                    alt={scene.title}
+                    className="rounded-lg object-cover w-full h-full"
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

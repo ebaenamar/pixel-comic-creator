@@ -14,24 +14,44 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || '',
 });
 
-async function generateImagePrompt(story: string): Promise<string> {
+interface ScenePrompt {
+  scene: string;
+  description: string;
+}
+
+async function generateImagePrompts(story: string): Promise<ScenePrompt[]> {
   try {
-    const prompt = `Create a vivid, detailed scene description for a surreal pixel art image based on this story: "${story}"
-    Focus on creating a Lynch-inspired, dreamlike scene that would work well as pixel art.
-    Include specific details about:
-    - The main visual elements
+    const prompt = `Create two connected scenes for a surreal pixel art comic based on this story: "${story}"
+    Focus on creating Lynch-inspired, dreamlike scenes that work well as pixel art and flow together narratively.
+    
+    For each scene, include:
+    - The main visual elements and action
     - The mood and atmosphere
     - The lighting and colors
     - Any surreal or symbolic elements
     
-    Format the response as a single, detailed paragraph that can be used as an image generation prompt.`;
+    Format your response as a JSON array with exactly 2 objects, each containing:
+    - scene: A short title for the scene
+    - description: A detailed paragraph describing the scene for image generation
+    
+    Example format:
+    [
+      {
+        "scene": "The Mysterious Phone Call",
+        "description": "In a dimly lit room, a figure answers an old rotary phone..."
+      },
+      {
+        "scene": "The Dream Sequence",
+        "description": "The scene transitions to a surreal dreamscape..."
+      }
+    ]`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are a surreal pixel artist specializing in David Lynch-inspired imagery. Create detailed, atmospheric scene descriptions."
+          content: "You are a surreal pixel artist specializing in David Lynch-inspired imagery. Create detailed, atmospheric scene descriptions that connect narratively."
         },
         {
           role: "user",
@@ -39,23 +59,31 @@ async function generateImagePrompt(story: string): Promise<string> {
         }
       ],
       temperature: 0.7,
+      response_format: { type: "json_object" }
     });
 
     const content = completion.choices[0].message.content;
     if (!content) {
-      throw new Error('Failed to generate image description');
+      throw new Error('Failed to generate scene descriptions');
     }
 
-    return `A pixel art scene in David Lynch's style: ${content}`;
+    const scenes = JSON.parse(content).scenes || [];
+    if (!Array.isArray(scenes) || scenes.length !== 2) {
+      throw new Error('Invalid scene format returned');
+    }
+
+    return scenes.map(scene => ({
+      scene: scene.scene,
+      description: `A pixel art scene in David Lynch's style: ${scene.description}`
+    }));
   } catch (error) {
-    console.error('Error generating prompt:', error);
-    throw new Error('Failed to generate image description');
+    console.error('Error generating prompts:', error);
+    throw new Error('Failed to generate scene descriptions');
   }
 }
 
 async function generateImage(prompt: string): Promise<string> {
   try {
-    // Create the prediction
     const prediction = await replicate.predictions.create({
       version: "ad2ed84b27e27ce1e4a613c9b9c3b9c562bd8ca4b0271a35352ca158be1708b5",
       input: {
@@ -69,21 +97,18 @@ async function generateImage(prompt: string): Promise<string> {
       }
     });
 
-    // Extract the stream URL directly from the prediction response
     const streamUrl = prediction.urls?.stream;
     if (streamUrl) {
       return streamUrl;
     }
 
-    // If no stream URL, fall back to polling for the output
     const predictionUrl = prediction.urls?.get;
     if (!predictionUrl) {
       throw new Error('Failed to get prediction URL');
     }
 
-    // Poll for the result
     let attempts = 0;
-    const maxAttempts = 180; // 3 minutes timeout
+    const maxAttempts = 180;
     
     while (attempts < maxAttempts) {
       const response = await fetch(predictionUrl);
@@ -124,20 +149,33 @@ export async function POST(req: Request) {
       );
     }
     
-    // Generate the image description with GPT-4
-    const imagePrompt = await generateImagePrompt(prompt);
+    // Generate two scene descriptions
+    const scenes = await generateImagePrompts(prompt);
     
-    // Generate the image with Replicate
-    const imageUrl = await generateImage(imagePrompt);
+    // Generate both images in parallel
+    const [image1, image2] = await Promise.all([
+      generateImage(scenes[0].description),
+      generateImage(scenes[1].description)
+    ]);
     
     return NextResponse.json({ 
-      url: imageUrl,
-      prompt: imagePrompt 
+      scenes: [
+        {
+          title: scenes[0].scene,
+          description: scenes[0].description,
+          url: image1
+        },
+        {
+          title: scenes[1].scene,
+          description: scenes[1].description,
+          url: image2
+        }
+      ]
     });
   } catch (error) {
-    console.error('Error generating image:', error);
+    console.error('Error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate image' },
+      { error: 'Failed to generate comic' },
       { status: 500 }
     );
   }

@@ -1,24 +1,21 @@
 'use client';
 
-import { useState } from 'react';
 import ComicGenerator from '@/components/ComicGenerator';
 
 export default function Home() {
-  const [story, setStory] = useState('');
-
   return (
-    <main className="min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
-      <div className="space-y-6">
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500">
-            Pixel Art Dream Generator
+    <main className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-indigo-900 text-white py-12">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+            Pixel Art Comic Creator
           </h1>
-          <p className="text-lg text-gray-300">
-            Transform your ideas into surreal, Lynch-inspired pixel art scenes
+          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+            Enter your story and watch as AI transforms it into a surreal, Lynch-inspired pixel art comic sequence.
           </p>
         </div>
-
-        <ComicGenerator story={story} setStory={setStory} />
+        
+        <ComicGenerator />
       </div>
     </main>
   );
