@@ -28,38 +28,21 @@ async function generateImagePrompts(story: string): Promise<ScenePrompt[]> {
     - The main visual elements and action
     - The mood and atmosphere
     - The lighting and colors
-    - Any surreal or symbolic elements
-    
-    Format your response as a JSON array with exactly 2 objects, each containing:
-    - scene: A short title for the scene
-    - description: A detailed paragraph describing the scene for image generation
-    
-    Example format:
-    [
-      {
-        "scene": "The Mysterious Phone Call",
-        "description": "In a dimly lit room, a figure answers an old rotary phone..."
-      },
-      {
-        "scene": "The Dream Sequence",
-        "description": "The scene transitions to a surreal dreamscape..."
-      }
-    ]`;
+    - Any surreal or symbolic elements`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are a surreal pixel artist specializing in David Lynch-inspired imagery. Create detailed, atmospheric scene descriptions that connect narratively."
+          content: "You are a surreal pixel artist specializing in David Lynch-inspired imagery. Create detailed, atmospheric scene descriptions that connect narratively. Return exactly two scenes, each with a title and description."
         },
         {
           role: "user",
           content: prompt
         }
       ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
+      temperature: 0.7
     });
 
     const content = completion.choices[0].message.content;
@@ -67,15 +50,22 @@ async function generateImagePrompts(story: string): Promise<ScenePrompt[]> {
       throw new Error('Failed to generate scene descriptions');
     }
 
-    const scenes = JSON.parse(content).scenes || [];
-    if (!Array.isArray(scenes) || scenes.length !== 2) {
-      throw new Error('Invalid scene format returned');
+    // Parse the content into two scenes
+    const scenes = content.split('\n\n').filter(Boolean).slice(0, 2).map(sceneText => {
+      const lines = sceneText.split('\n');
+      const scene = lines[0].replace(/^(Scene \d+:|Title:|#)\s*/i, '').trim();
+      const description = lines.slice(1).join(' ').trim();
+      return {
+        scene,
+        description: `A pixel art scene in David Lynch's style: ${description}`
+      };
+    });
+
+    if (scenes.length !== 2) {
+      throw new Error('Failed to generate two scenes');
     }
 
-    return scenes.map(scene => ({
-      scene: scene.scene,
-      description: `A pixel art scene in David Lynch's style: ${scene.description}`
-    }));
+    return scenes;
   } catch (error) {
     console.error('Error generating prompts:', error);
     throw new Error('Failed to generate scene descriptions');
